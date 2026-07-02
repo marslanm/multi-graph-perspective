@@ -1,0 +1,10 @@
+# RL-based Dynamic Fusion — Python dependencies
+gymnasium>=0.29
+stable-baselines3>=2.0
+sb3-contrib>=2.0        # optional, only needed for --algo trpo
+torch>=2.0
+scikit-learn>=1.2
+pandas>=1.5
+numpy>=1.23
+tqdm>=4.65             # progress bar during training
+rich>=13.0             # progress bar during training
