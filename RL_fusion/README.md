@@ -50,10 +50,13 @@ pip install -r requirements.txt
 
 ## Data
 
-The label and split files are included under `data/`:
+The ACL-2020 label and split files are included under `data/`:
 
 - `data/corpus.tsv` — outlet labels (bias / factuality)
 - `data/splits.json` — 5-fold cross-validation splits
+
+For MBFC-2025, download `mbfc2025_large_labels.pkl` and `Splits/Large/`
+from the same data folder as the embeddings.
 
 The **embedding data is large (~2.3 GB)** and is **not** stored in this repo.
 Download it and place the files/folders directly inside `data/` (or point to
