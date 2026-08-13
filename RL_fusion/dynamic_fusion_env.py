@@ -178,25 +178,51 @@ class DynamicFusionEnv(gym.Env):
             # Load GNN embeddings
             self._load_gnn_embeddings_large()
         
-        # Load corpus for labels (if available)
-        corpus_path = f"{self.data_dir}/corpus.tsv"
-        if os.path.exists(corpus_path):
-            self.corpus_df = pd.read_csv(corpus_path, sep='\t')
+        if self.dataset_size == "large":
+            labels_path = f"{self.data_dir}/mbfc2025_large_labels.pkl"
+            split_name = (
+                "task_1_a_distribution_source_url.json"
+                if self.task == "bias"
+                else "task_1_b_distribution_source_url.json"
+            )
+            splits_path = f"{self.data_dir}/Splits/Large/{split_name}"
+
+            if not os.path.exists(labels_path):
+                raise FileNotFoundError(
+                    f"MBFC-2025 labels not found: {labels_path}. "
+                    "Download mbfc2025_large_labels.pkl into the data directory."
+                )
+            if not os.path.exists(splits_path):
+                raise FileNotFoundError(
+                    f"MBFC-2025 split not found: {splits_path}. "
+                    "Download the Splits/Large directory into the data directory."
+                )
+
+            self.corpus_df = pd.read_pickle(labels_path)
+            with open(splits_path, "r") as f:
+                large_splits = json.load(f)
+            self.splits = {
+                "train": [self._normalize_url(url)
+                          for url in large_splits["train"] + large_splits["val"]],
+                "test": [self._normalize_url(url) for url in large_splits["test"]],
+            }
         else:
-            # Use media_df as corpus
-            self.corpus_df = self.media_df.copy()
-            
-        # Load splits
-        splits_path = f"{self.data_dir}/splits.json"
-        if os.path.exists(splits_path):
-            with open(splits_path, 'r') as f:
-                all_splits = json.load(f)
-                domain_splits = all_splits[str(self.split_id)]
-                # Convert domain-based splits to name-based splits
-                self._convert_domain_splits_to_name_splits(domain_splits)
-        else:
-            # Create splits if not available
-            self._create_splits()
+            # ACL-2020 labels and five-fold splits
+            corpus_path = f"{self.data_dir}/corpus.tsv"
+            if os.path.exists(corpus_path):
+                self.corpus_df = pd.read_csv(corpus_path, sep="\t")
+            else:
+                self.corpus_df = self.media_df.copy()
+
+            splits_path = f"{self.data_dir}/splits.json"
+            if os.path.exists(splits_path):
+                with open(splits_path, "r") as f:
+                    all_splits = json.load(f)
+                    self._convert_domain_splits_to_name_splits(
+                        all_splits[str(self.split_id)]
+                    )
+            else:
+                self._create_splits()
 
     def _load_gnn_embeddings_small(self):
         """Load GNN embeddings for small dataset."""
@@ -340,6 +366,8 @@ class DynamicFusionEnv(gym.Env):
                 label = row['bias']
             else:  # factuality
                 label = row['fact']
+            if pd.isna(label) or label == '':
+                continue
             self.outlet_labels[outlet_name] = label
         
         # Fit label encoder
@@ -808,9 +836,14 @@ class DynamicFusionEnv(gym.Env):
         y_pred = self.episode_predictions
         
         # Convert labels to numeric for MAE computation
-        label_to_num = {'left': 0, 'leftcenter': 1, 'center': 2, 'rightcenter': 3, 'right': 4}
+        label_to_num = {'left': 0, 'leftcenter': 1, 'center': 2,
+                        'rightcenter': 3, 'right': 4}
         if self.task == "fact":
-            label_to_num = {'low': 0, 'mixed': 1, 'high': 2}  # Adjust based on factuality labels
+            if self.dataset_size == "large":
+                label_to_num = {'very low': 0, 'low': 1, 'mixed': 2,
+                                'high': 3, 'very high': 4}
+            else:
+                label_to_num = {'low': 0, 'mixed': 1, 'high': 2}
         
         y_true_numeric = [label_to_num.get(label, 0) for label in y_true]
         y_pred_numeric = [label_to_num.get(label, 0) for label in y_pred]
